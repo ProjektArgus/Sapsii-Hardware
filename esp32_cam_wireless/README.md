@@ -10,6 +10,8 @@ This sketch turns an AI-Thinker ESP32-CAM into an MJPEG camera suitable for a ph
 | `http://<camera-ip>/stream` | Continuous `multipart/x-mixed-replace` MJPEG stream |
 | `http://<camera-ip>/capture` | One JPEG frame, useful for testing |
 
+The firmware also advertises `_sapseedcam._tcp` over mDNS so the Sapseed app can discover it automatically. Its hostname is `sapseed-cam.local` when the network supports mDNS.
+
 ## Hardware
 
 - AI-Thinker ESP32-CAM with OV2640 camera
@@ -79,11 +81,21 @@ The ESP32 supports 2.4 GHz Wi-Fi, not a 5 GHz-only SSID. The phone must be on th
 
 If capture fails or the board resets, use a better 5 V supply and shorter wires. If latency grows, ensure the app discards old frames rather than queues them.
 
-## Mobile app changes
+## Use with the Sapseed Android app
 
-The mobile app is in another repository, so no app source is changed here. Its camera/input layer should support a second source such as `ESP32_MJPEG`, configured with the stream URL.
+1. Flash this sketch and connect the phone using either AP mode or the same 2.4 GHz LAN.
+2. Open Sapseed. **Camera: Mobile** is the default source.
+3. Tap **Camera: Mobile** at the top of the app.
+4. Choose **Discover wireless camera**. The firmware advertises itself over mDNS and the app connects to the first Sapseed camera it finds.
+5. If discovery is unavailable on the router, choose **Enter camera IP or URL** and enter either `192.168.4.1`, the LAN IP printed in Serial Monitor, or a complete URL such as `http://192.168.4.1/stream`.
+6. Wait for **Wireless camera connected**, confirm that its preview is moving, and tap **LiteRT GPU ★**.
+7. Tap the camera selector again and choose **Camera: Mobile** to switch back.
 
-### Required data path
+On the ESP32's direct access point, the manual address is always `192.168.4.1`. Android may report that this Wi-Fi network has no internet; choose to remain connected.
+
+The app keeps only the newest MJPEG frame, decodes it into the same A/R/G/B representation used by CameraX, and feeds it through the existing YOLO11n LiteRT GPU path. It reconnects automatically after a temporary stream interruption.
+
+### App data path
 
 ```text
 HTTP MJPEG stream
@@ -160,4 +172,5 @@ The firmware's `CAMERA_GRAB_LATEST` plus two PSRAM frame buffers reduces stale-c
 - HTTP responses disable caching and include CORS for clients that need it.
 - `/capture` and `/` health/status endpoints were added for troubleshooting.
 - HTTP startup and URI registration failures are checked.
+- `_sapseedcam._tcp` mDNS advertising was added for in-app discovery.
 - Stale sockets can be purged, and all frame buffers are returned on stream exit paths.

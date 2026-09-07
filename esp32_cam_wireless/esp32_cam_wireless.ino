@@ -1,5 +1,6 @@
 #include "esp_camera.h"
 #include "esp_http_server.h"
+#include <ESPmDNS.h>
 #include <WiFi.h>
 
 // AI-Thinker ESP32-CAM only.
@@ -183,6 +184,17 @@ void connectNetwork() {
   }
 }
 
+void startDiscoveryService() {
+  if (!MDNS.begin("sapseed-cam")) {
+    Serial.println("mDNS discovery failed; connect by IP instead");
+    return;
+  }
+  MDNS.addService("sapseedcam", "tcp", 80);
+  MDNS.addServiceTxt("sapseedcam", "tcp", "path", "/stream");
+  MDNS.addServiceTxt("sapseedcam", "tcp", "model", "AI-Thinker ESP32-CAM");
+  Serial.println("Discovery name: sapseed-cam.local");
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
@@ -226,6 +238,7 @@ void setup() {
   }
 
   connectNetwork();
+  startDiscoveryService();
   if (!startCameraServer()) {
     Serial.println("HTTP server failed to start");
     return;
