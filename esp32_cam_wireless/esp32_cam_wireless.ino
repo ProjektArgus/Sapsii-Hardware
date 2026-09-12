@@ -23,8 +23,8 @@
 
 // Leave WIFI_SSID empty to create the ESP32-CAM-YOLO access point.
 // If station connection times out, the camera also falls back to this AP.
-constexpr char WIFI_SSID[] = "";
-constexpr char WIFI_PASSWORD[] = "";
+constexpr char WIFI_SSID[] = "Satyam's S24 Ultra";
+constexpr char WIFI_PASSWORD[] = "12345678";
 constexpr char AP_SSID[] = "ESP32-CAM-YOLO";
 constexpr char AP_PASSWORD[] = "12345678"; // WPA2 requires at least 8 characters.
 constexpr uint32_t WIFI_TIMEOUT_MS = 20000;
@@ -195,9 +195,14 @@ void startDiscoveryService() {
   Serial.println("Discovery name: sapseed-cam.local");
 }
 
-void setup() {
-  Serial.begin(115200);
-  Serial.setDebugOutput(false);
+esp_err_t initializeCamera() {
+  // A software reset does not reset the separately powered OV2640. Force a
+  // hardware power cycle so SCCB probing starts from a known sensor state.
+  pinMode(PWDN_GPIO_NUM, OUTPUT);
+  digitalWrite(PWDN_GPIO_NUM, HIGH);
+  delay(100);
+  digitalWrite(PWDN_GPIO_NUM, LOW);
+  delay(100);
 
   camera_config_t config = {};
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -220,15 +225,36 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QVGA; // 320x240; resize/crop to the model input on phone.
-  config.jpeg_quality = psramFound() ? 12 : 14;
-  config.fb_count = psramFound() ? 2 : 1;
-  config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
-  config.grab_mode = psramFound() ? CAMERA_GRAB_LATEST : CAMERA_GRAB_WHEN_EMPTY;
 
-  const esp_err_t cameraResult = esp_camera_init(&config);
+  // Match Espressif's known-good CameraWebServer initialization. Resolution
+  // is reduced to QVGA after probing for lower app latency.
+  config.frame_size = FRAMESIZE_UXGA;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.fb_location = CAMERA_FB_IN_PSRAM;
+  config.jpeg_quality = 12;
+  config.fb_count = 1;
+
+  if (psramFound()) {
+    config.jpeg_quality = 10;
+    config.fb_count = 2;
+    config.grab_mode = CAMERA_GRAB_LATEST;
+  } else {
+    config.frame_size = FRAMESIZE_SVGA;
+    config.fb_location = CAMERA_FB_IN_DRAM;
+  }
+
+  return esp_camera_init(&config);
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.setDebugOutput(true);
+  Serial.println();
+
+  const esp_err_t cameraResult = initializeCamera();
   if (cameraResult != ESP_OK) {
     Serial.printf("Camera initialization failed: 0x%x\n", cameraResult);
+    Serial.println("Expected AI-Thinker pinout with an OV2640 camera.");
     return;
   }
 

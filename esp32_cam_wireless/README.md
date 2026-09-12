@@ -81,6 +81,8 @@ The ESP32 supports 2.4 GHz Wi-Fi, not a 5 GHz-only SSID. The phone must be on th
 
 If capture fails or the board resets, use a better 5 V supply and shorter wires. If latency grows, ensure the app discards old frames rather than queues them.
 
+If Serial Monitor reports `Camera probe failed with error 0x106`, confirm that **AI Thinker ESP32-CAM** is selected and that the ribbon cable is fully seated with its contacts facing the correct direction. This sketch explicitly power-cycles the OV2640 before probing (important after `SW_CPU_RESET`) and uses the same camera initialization settings as Espressif's CameraWebServer example.
+
 ## Use with the Sapseed Android app
 
 1. Flash this sketch and connect the phone using either AP mode or the same 2.4 GHz LAN.
